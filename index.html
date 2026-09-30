@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Viridian — Generative Systems Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700;900&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  /* ---------- Base ---------- */
+  html, body { margin: 0; padding: 0; }
+  html { scrollbar-width: none; -ms-overflow-style: none; }
+  html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; }
+  body {
+    background: radial-gradient(ellipse at 20% 30%, #080018 0%, #02000a 45%, #010005 100%);
+    background-attachment: fixed;
+    min-height: 100vh;
+    color: #fff;
+    font-family: 'DM Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  html.hide-cursor, html.hide-cursor * { cursor: none !important; }
+  a { color: #ff5c00; text-decoration: none; }
+  a:hover { color: #ff8a45; }
+  @keyframes vPulse { 0%, 100% { opacity: .25; } 50% { opacity: .75; } }
+
+  /* ---------- Canvas + custom cursor ---------- */
+  #canvas-host { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+  .cursor-dot, .cursor-ring {
+    position: fixed; left: 0; top: 0; z-index: 100;
+    pointer-events: none; will-change: transform; border-radius: 50%;
+    display: none;
+  }
+  .cursor-dot { width: 8px; height: 8px; margin: -4px 0 0 -4px; background: #fff; }
+  .cursor-ring {
+    width: 36px; height: 36px; margin: -18px 0 0 -18px;
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    transition: border-color .25s, width .25s, height .25s, margin .25s;
+  }
+  html.hide-cursor .cursor-dot, html.hide-cursor .cursor-ring { display: block; }
+
+  /* ---------- Sections ---------- */
+  main { position: relative; z-index: 10; }
+  section { position: relative; min-height: 100vh; box-sizing: border-box; background: transparent; }
+
+  .label {
+    color: #ff5c00; font-size: 13px; font-weight: 700;
+    letter-spacing: 0.28em; text-transform: uppercase;
+  }
+  .dim { color: rgba(255, 255, 255, 0.5); text-wrap: pretty; }
+
+  /* 1 · Hero */
+  .hero {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 0 6vw;
+  }
+  .hero .label { margin-bottom: 28px; }
+  .hero h1 {
+    margin: 0; font-weight: 900; font-size: clamp(3.5rem, 6vw, 7rem);
+    line-height: 0.95; letter-spacing: -0.035em; color: #fff; text-wrap: balance;
+  }
+  .hero p { margin: 28px 0 0; font-size: clamp(1rem, 1.3vw, 1.25rem); max-width: 520px; line-height: 1.5; }
+  .scroll-hint {
+    position: absolute; bottom: 40px; left: 0; right: 0; text-align: center;
+    font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.7); animation: vPulse 2.4s ease-in-out infinite;
+  }
+
+  /* Shared large heading (sections 2 + 4) */
+  .h-lg {
+    margin: 0; font-weight: 900; font-size: clamp(2.2rem, 4vw, 4rem);
+    line-height: 1; letter-spacing: -0.03em; text-wrap: balance;
+  }
+  .copy-lg { font-size: 1.1rem; line-height: 1.6; }
+
+  /* 2 · Vortex */
+  .vortex { display: flex; align-items: center; justify-content: center; padding: 0 6vw; }
+  .vortex .block { max-width: 600px; text-align: center; }
+  .vortex .label { margin-bottom: 22px; }
+  .vortex p { margin: 24px auto 0; max-width: 480px; }
+
+  /* 3 · Polaris */
+  .polaris .col {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    width: max(22vw, 240px);
+  }
+  .polaris .col.left { left: 6vw; }
+  .polaris .col.right { right: 6vw; text-align: right; }
+  .polaris .label { margin-bottom: 18px; }
+  .polaris h3 {
+    margin: 0; font-weight: 900; font-size: clamp(1.6rem, 2.4vw, 2.6rem);
+    line-height: 1.05; letter-spacing: -0.025em; text-wrap: balance;
+  }
+  .polaris p { margin: 18px 0 0; font-size: 1rem; line-height: 1.6; }
+
+  /* 4 · Waves */
+  .waves .block {
+    position: absolute; left: 6vw; top: 50%; transform: translateY(-50%);
+    width: max(36vw, 300px);
+  }
+  .waves .label { margin-bottom: 22px; }
+  .waves p { margin: 24px 0 0; max-width: 440px; }
+  .btn-row { display: flex; margin-top: 36px; }
+  .btn-ghost {
+    display: inline-flex; align-items: center; gap: 10px; padding: 16px 30px;
+    border: 1px solid #ff5c00; border-radius: 999px; color: #fff; background: transparent;
+    font-weight: 700; font-size: 15px; letter-spacing: 0.02em;
+    transition: background .25s, color .25s;
+  }
+  .btn-ghost:hover { background: #ff5c00; color: #0a0205; }
+
+  /* 5 · CTA */
+  .cta {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 0 6vw; background: rgba(5, 0, 15, 0.88);
+  }
+  .cta h2 {
+    margin: 0; font-weight: 900; font-size: clamp(3rem, 5.5vw, 6rem);
+    line-height: 0.95; letter-spacing: -0.035em; text-wrap: balance;
+  }
+  .cta p { margin: 24px 0 0; font-size: 1.15rem; max-width: 480px; line-height: 1.5; }
+  .cta .btn-row { margin-top: 40px; }
+  .btn-solid {
+    display: inline-flex; align-items: center; padding: 18px 36px; border-radius: 999px;
+    background: #ff5c00; color: #0a0205; font-weight: 700; font-size: 16px; letter-spacing: 0.02em;
+    transition: background .25s, transform .25s;
+  }
+  .btn-solid:hover { background: #ff7a2e; color: #0a0205; transform: translateY(-2px); }
+
+  /* ---------- Phones: stack absolutely-positioned text so it doesn't overlap ---------- */
+  @media (max-width: 700px) {
+    .polaris, .waves {
+      display: flex; flex-direction: column; justify-content: center; gap: 48vh;
+      padding: 12vh 6vw;
+    }
+    .polaris .col, .waves .block {
+      position: static; transform: none; width: auto;
+    }
+    .polaris .col.right { text-align: left; }
+  }
+</style>
+</head>
+<body>
+
+<div id="canvas-host"></div>
+<div class="cursor-dot" id="cursor-dot"></div>
+<div class="cursor-ring" id="cursor-ring"></div>
+
+<main>
+  <!-- 1 · Exploded hero -->
+  <section class="hero" data-formation="exploded">
+    <div class="label">Generative Systems Studio</div>
+    <h1>Order from noise.</h1>
+    <p class="dim">We build living brand systems that move, react and evolve with the people who use them.</p>
+    <div class="scroll-hint">Scroll to explore ↓</div>
+  </section>
+
+  <!-- 2 · Vortex galaxy -->
+  <section class="vortex" data-formation="vortex">
+    <div class="block">
+      <div class="label">01 — Gravity</div>
+      <h2 class="h-lg">Everything orbits a clear idea.</h2>
+      <p class="dim copy-lg">We start at the core — one sharp thought — and let every touchpoint spiral out from it. Nothing drifts off course.</p>
+    </div>
+  </section>
+
+  <!-- 3 · Polaris -->
+  <section class="polaris" data-formation="polaris">
+    <div class="col left">
+      <div class="label">02 — Structure</div>
+      <h3>Precision at every radius.</h3>
+      <p class="dim">Grids, type scales and motion rules engineered to hold together from favicon to billboard.</p>
+    </div>
+    <div class="col right">
+      <div class="label">03 — Rhythm</div>
+      <h3>Repeats without repeating.</h3>
+      <p class="dim">Generative rules give every output a family resemblance — and never the same face twice.</p>
+    </div>
+  </section>
+
+  <!-- 4 · Waves -->
+  <section class="waves" data-formation="waves">
+    <div class="block">
+      <div class="label">04 — Motion</div>
+      <h2 class="h-lg">Built to flow, not to freeze.</h2>
+      <p class="dim copy-lg">Identities that respond to data, sound and touch in real time. Your brand stops being a file and starts being a current.</p>
+      <div class="btn-row"><a class="btn-ghost" href="#contact">See the work →</a></div>
+    </div>
+  </section>
+
+  <!-- 5 · CTA (no formation: the waves keep running behind it) -->
+  <section class="cta" id="contact">
+    <h2>Ready to start?</h2>
+    <p class="dim">Tell us what you're building — we'll bring the momentum.</p>
+    <div class="btn-row"><a class="btn-solid" href="mailto:hello@viridian.studio">Get in touch</a></div>
+  </section>
+</main>
+
+<script>
+(function () {
+  // ---- Settings (these were the "Tweaks" in the design) ----
+  var HALO_OPACITY = 0.13;  // soft glow strength (0 – 0.4)
+  var SPIN_SPEED = 1;       // rotation speed multiplier (0 – 3)
+  // Custom cursor only on devices with a real mouse (not phones/tablets)
+  var CUSTOM_CURSOR = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+
+  var N = 3000, TAU = Math.PI * 2;
+  var host = document.getElementById('canvas-host');
+
+  // ---- Renderer, scene, camera ----
+  var renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setClearColor(0x000000, 0);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  host.appendChild(renderer.domElement);
+
+  var scene = new THREE.Scene();
+  var camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 5000);
+  camera.position.set(0, 0, 520);
+
+  // ---- Shared geometry (both particle systems use the same positions) ----
+  var pos = new Float32Array(N * 3), col = new Float32Array(N * 3);
+  var geo = new THREE.BufferGeometry();
+  var posAttr = new THREE.BufferAttribute(pos, 3), colAttr = new THREE.BufferAttribute(col, 3);
+  geo.setAttribute('position', posAttr);
+  geo.setAttribute('color', colAttr);
+
+  // Round, soft-edged texture for the halo so it doesn't look like squares
+  var c = document.createElement('canvas'); c.width = c.height = 64;
+  var g = c.getContext('2d'), grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grd.addColorStop(0, 'rgba(255,255,255,1)');
+  grd.addColorStop(0.35, 'rgba(255,255,255,0.5)');
+  grd.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grd; g.fillRect(0, 0, 64, 64);
+  var haloTex = new THREE.CanvasTexture(c);
+
+  // System A — sharp cores / System B — soft halo
+  var matA = new THREE.PointsMaterial({ size: 1.8, vertexColors: true, transparent: true, opacity: 1.0, blending: THREE.AdditiveBlending, depthWrite: false });
+  var matB = new THREE.PointsMaterial({ size: 7, vertexColors: true, transparent: true, opacity: HALO_OPACITY, blending: THREE.AdditiveBlending, depthWrite: false, map: haloTex });
+  scene.add(new THREE.Points(geo, matA));
+  scene.add(new THREE.Points(geo, matB));
+
+  // ---- Colours (green spectrum only) ----
+  function rgb(r, g, b) { return [r / 255, g / 255, b / 255]; }
+  var LIME = rgb(100, 255, 120), WHITE = [1, 1, 1];
+  var palette = [[0.35, LIME], [0.25, rgb(60, 230, 80)], [0.20, rgb(0, 220, 160)], [0.12, rgb(180, 255, 60)], [0.08, rgb(220, 255, 220)]];
+  var baseCol = new Float32Array(N * 3);
+  for (var i = 0; i < N; i++) {
+    var r = Math.random(), acc = 0, pick = palette[0][1];
+    for (var p = 0; p < palette.length; p++) { acc += palette[p][0]; if (r <= acc) { pick = palette[p][1]; break; } }
+    baseCol.set(pick, i * 3);
+  }
+  function rnd() { return Math.random() - 0.5; }
+
+  // ---- Formation 1 — exploded ----
+  var exploded = new Float32Array(N * 3);
+  for (i = 0; i < N; i++) {
+    var er = 80 + Math.random() * 320, th = Math.random() * TAU, ph = Math.acos(2 * Math.random() - 1);
+    exploded[i * 3]     = er * Math.sin(ph) * Math.cos(th) + rnd() * 10;
+    exploded[i * 3 + 1] = er * Math.sin(ph) * Math.sin(th) + rnd() * 10;
+    exploded[i * 3 + 2] = er * Math.cos(ph) + rnd() * 10;
+  }
+
+  // ---- Formation 2 — vortex galaxy ----
+  var vortex = new Float32Array(N * 3), vortexCol = new Float32Array(baseCol);
+  var k = 0, perArm = 550;
+  for (var a = 0; a < 4; a++) {
+    var base = a * (Math.PI / 2);
+    for (i = 0; i < perArm; i++, k++) {
+      var t = i / perArm, radius = 20 + t * 260, ang = base + t * 4.2 + Math.random() * 0.35;
+      vortex[k * 3]     = radius * Math.cos(ang) + rnd() * 18;
+      vortex[k * 3 + 1] = rnd() * 28;
+      vortex[k * 3 + 2] = radius * Math.sin(ang) + rnd() * 18;
+    }
+  }
+  for (i = 0; i < 500; i++, k++) { // bright core
+    var cr = 35 * Math.cbrt(Math.random()), cth = Math.random() * TAU, cph = Math.acos(2 * Math.random() - 1);
+    vortex[k * 3]     = cr * Math.sin(cph) * Math.cos(cth);
+    vortex[k * 3 + 1] = cr * Math.sin(cph) * Math.sin(cth);
+    vortex[k * 3 + 2] = cr * Math.cos(cph);
+    vortexCol.set(Math.random() < 0.7 ? WHITE : LIME, k * 3);
+  }
+  for (i = 0; i < 300; i++, k++) { // outer haze
+    var hr = 260 + Math.random() * 160, hth = Math.random() * TAU;
+    vortex[k * 3] = hr * Math.cos(hth); vortex[k * 3 + 1] = rnd() * 30; vortex[k * 3 + 2] = hr * Math.sin(hth);
+  }
+
+  // ---- Formation 3 — Polaris disk ----
+  var polaris = new Float32Array(N * 3), polarisCol = new Float32Array(baseCol);
+  k = 0;
+  var radii = [30, 60, 95, 130, 165, 200, 235, 270], counts = [50, 100, 150, 200, 250, 300, 400, 550];
+  for (var ri = 0; ri < radii.length; ri++) {
+    for (i = 0; i < counts[ri]; i++, k++) {
+      var pa = (i / counts[ri]) * TAU;
+      polaris[k * 3] = radii[ri] * Math.cos(pa); polaris[k * 3 + 1] = 0; polaris[k * 3 + 2] = radii[ri] * Math.sin(pa);
+    }
+  }
+  for (i = 0; i < 800; i++, k++) { // 12 spokes
+    var sa = (i % 12) * (Math.PI / 6), sr = (Math.floor(i / 12) / 66) * 270;
+    polaris[k * 3] = sr * Math.cos(sa); polaris[k * 3 + 1] = 0; polaris[k * 3 + 2] = sr * Math.sin(sa);
+  }
+  for (i = 0; i < 200; i++, k++) { // white centre
+    var zr = 8 * Math.cbrt(Math.random()), zth = Math.random() * TAU, zph = Math.acos(2 * Math.random() - 1);
+    polaris[k * 3]     = zr * Math.sin(zph) * Math.cos(zth);
+    polaris[k * 3 + 1] = zr * Math.cos(zph) * 0.5;
+    polaris[k * 3 + 2] = zr * Math.sin(zph) * Math.sin(zth);
+    polarisCol.set(WHITE, k * 3);
+  }
+
+  // ---- Formation 4 — flowing waves (recomputed every frame) ----
+  var sheetCols = [rgb(0, 100, 60), rgb(0, 160, 90), rgb(40, 210, 110), rgb(80, 245, 140), rgb(140, 255, 160), rgb(210, 255, 220)];
+  var wavesCol = new Float32Array(N * 3);
+  for (i = 0; i < N; i++) wavesCol.set(sheetCols[Math.floor(i / 500)], i * 3);
+  var wavesBuf = new Float32Array(N * 3);
+  function computeWaves(elapsed) {
+    // Reads window size each frame, so resizing is handled automatically
+    var W = window.innerWidth, H = window.innerHeight, phase = -elapsed * 0.0014;
+    for (var i = 0; i < N; i++) {
+      var s = Math.floor(i / 500), j = i % 500, colI = j % 50, row = Math.floor(j / 50);
+      var xBase = (colI - 25) * (W / 50), yBase = (row - 4.5) * (H / 10);
+      var amp = 32 + s * 7, freq = 0.012 - s * 0.001;
+      wavesBuf[i * 3]     = xBase;
+      wavesBuf[i * 3 + 1] = yBase + amp * Math.sin(freq * xBase + phase + s * 0.9);
+      wavesBuf[i * 3 + 2] = (s - 2.5) * 80 + amp * 0.3 * Math.cos(freq * xBase * 0.5 + phase);
+    }
+    return wavesBuf;
+  }
+
+  var F = {
+    exploded: { pos: exploded, col: baseCol },
+    vortex:   { pos: vortex,   col: vortexCol },
+    polaris:  { pos: polaris,  col: polarisCol },
+    waves:    { pos: null,     col: wavesCol }
+  };
+
+  // ---- Morph ----
+  var mode = 'exploded', morph = null;
+  function morphTo(name, dur) {
+    mode = name;
+    morph = { sp: new Float32Array(pos), sc: new Float32Array(col), t0: performance.now(), dur: dur || 1800 };
+  }
+  col.set(baseCol);
+  morphTo('exploded', 2400);
+
+  // Trigger a morph when 40% of a section is visible
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      var f = e.target.getAttribute('data-formation');
+      if (f && f !== mode) morphTo(f);
+    });
+  }, { threshold: 0.4 });
+  document.querySelectorAll('[data-formation]').forEach(function (el) { io.observe(el); });
+
+  // ---- Mouse + resize ----
+  var mx = 0, my = 0, cx = window.innerWidth / 2, cy = window.innerHeight / 2, rx = cx, ry = cy, hovering = false;
+  window.addEventListener('mousemove', function (e) {
+    cx = e.clientX; cy = e.clientY;
+    mx = (e.clientX / window.innerWidth) * 2 - 1;
+    my = -((e.clientY / window.innerHeight) * 2 - 1);
+    hovering = !!(e.target.closest && e.target.closest('a,button'));
+  });
+  window.addEventListener('resize', function () {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // Camera target per formation: [x, y, z, lerp speed]
+  var CAM = {
+    exploded: function () { return [mx * 180, my * 110, 520, 0.035]; },
+    vortex:   function () { return [mx * 60, 380 + my * 35, 380, 0.04]; },
+    polaris:  function () { return [mx * 60, 380 + my * 40, 380, 0.04]; },
+    waves:    function () { return [mx * 30, my * 20, 600, 0.03]; }
+  };
+  function lerp(a, b, t) { return a + (b - a) * t; }
+
+  var dot = document.getElementById('cursor-dot'), ring = document.getElementById('cursor-ring');
+  document.documentElement.classList.toggle('hide-cursor', CUSTOM_CURSOR);
+
+  // ---- Animation loop ----
+  var tStart = performance.now();
+  function loop() {
+    requestAnimationFrame(loop);
+    var now = performance.now(), elapsed = now - tStart;
+
+    var target = mode === 'waves' ? computeWaves(elapsed) : F[mode].pos;
+    if (morph) {
+      var t = Math.min(Math.max((now - morph.t0) / morph.dur, 0), 1);
+      var e = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; // ease-in-out quad
+      var tc = F[mode].col, sp = morph.sp, sc = morph.sc;
+      for (var i = 0; i < N * 3; i++) {
+        pos[i] = sp[i] + (target[i] - sp[i]) * e;
+        col[i] = sc[i] + (tc[i] - sc[i]) * e;
+      }
+      colAttr.needsUpdate = true; posAttr.needsUpdate = true;
+      if (t >= 1) morph = null;
+    } else if (mode === 'waves') {
+      pos.set(target); posAttr.needsUpdate = true;
+    }
+
+    if (mode === 'exploded') {
+      scene.rotation.x += 0.0002 * SPIN_SPEED;
+      scene.rotation.y += 0.0003 * SPIN_SPEED;
+    } else {
+      // Ease the explosion's tilt back to level for the flat formations
+      scene.rotation.x = lerp(scene.rotation.x, 0, 0.03);
+      scene.rotation.z = lerp(scene.rotation.z, 0, 0.03);
+      if (mode === 'vortex') scene.rotation.y += 0.0018 * SPIN_SPEED;
+      else if (mode === 'polaris') scene.rotation.y += 0.006 * SPIN_SPEED;
+      else scene.rotation.y = lerp(scene.rotation.y, Math.round(scene.rotation.y / TAU) * TAU, 0.03); // waves face the screen
+    }
+
+    var cam = CAM[mode]();
+    camera.position.x = lerp(camera.position.x, cam[0], cam[3]);
+    camera.position.y = lerp(camera.position.y, cam[1], cam[3]);
+    camera.position.z = lerp(camera.position.z, cam[2], cam[3]);
+    camera.lookAt(0, 0, 0);
+    renderer.render(scene, camera);
+
+    if (CUSTOM_CURSOR) {
+      rx = lerp(rx, cx, 0.1); ry = lerp(ry, cy, 0.1);
+      dot.style.transform = 'translate(' + cx + 'px, ' + cy + 'px)';
+      ring.style.transform = 'translate(' + rx + 'px, ' + ry + 'px) scale(' + (hovering ? 1.6 : 1) + ')';
+      ring.style.borderColor = hovering ? '#ff5c00' : 'rgba(255,255,255,0.6)';
+    }
+  }
+  loop();
+})();
+</script>
+</body>
+</html>
